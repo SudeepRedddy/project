@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 
+// Interfaces for Student and University
 interface Student {
   id: string;
   university_id: string;
@@ -10,7 +11,9 @@ interface Student {
   student_email: string;
   created_at: string;
   university?: {
+    id: string;
     name: string;
+    address?: string;
   };
 }
 
@@ -20,30 +23,23 @@ interface University {
   address?: string;
 }
 
+// The shape of our Authentication Context
 interface AuthContextType {
   user: User | null;
   student: Student | null;
   university: University | null;
   role: 'university' | 'student' | null;
   loading: boolean;
-  signUpAsUniversity: (data: { name: string; email: string; password: string }) => Promise<void>;
-  loginAsUniversity: (data: { email: string; password: string }) => Promise<void>;
-  loginAsStudent: (data: { email: string; rollNumber: string }) => Promise<void>;
+  signUpAsUniversity: (data: { name: string; email: string; password: string }) => Promise<any>;
+  loginAsUniversity: (data: { email: string; password: string }) => Promise<any>;
+  loginAsStudent: (data: { email: string; rollNumber: string }) => Promise<any>;
   signOut: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  student: null,
-  university: null,
-  role: null,
-  loading: true,
-  signUpAsUniversity: async () => {},
-  loginAsUniversity: async () => {},
-  loginAsStudent: async () => {},
-  signOut: async () => {},
-});
+// Create the context with a default value
+const AuthContext = createContext<AuthContextType>(null!);
 
+// The AuthProvider component that will wrap our application
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [student, setStudent] = useState<Student | null>(null);
@@ -51,261 +47,152 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<'university' | 'student' | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Initialize auth state
+  // Function to clear all authentication state
+  const clearAuthState = useCallback(() => {
+    setUser(null);
+    setStudent(null);
+    setUniversity(null);
+    setRole(null);
+    localStorage.removeItem('student_session');
+  }, []);
+
+  // Main effect for handling auth state changes and initial load
   useEffect(() => {
-    let mounted = true;
+    setLoading(true);
+    const studentSession = localStorage.getItem('student_session');
+    if (studentSession) {
+      setStudent(JSON.parse(studentSession));
+      setRole('student');
+      setLoading(false);
+      return;
+    }
 
-    const initializeAuth = async () => {
-      try {
-        // Check for student session first
-        const studentData = localStorage.getItem('student_session');
-        if (studentData && mounted) {
-          try {
-            const parsedStudent = JSON.parse(studentData);
-            setStudent(parsedStudent);
-            setRole('student');
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        supabase.from('universities').select('*').eq('id', session.user.id).single()
+          .then(({ data, error }) => {
+            if (!error && data) {
+              setUser(session.user);
+              setUniversity(data);
+              setRole('university');
+            }
             setLoading(false);
-            return;
-          } catch (err) {
-            localStorage.removeItem('student_session');
-          }
-        }
-
-        // Get Supabase session
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user && mounted) {
-          setUser(session.user);
-          await loadUserProfile(session.user);
-        }
-      } catch (error) {
-        console.error('Error initializing auth:', error);
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+          });
+      } else {
+        setLoading(false);
       }
-    };
+    });
 
-    initializeAuth();
-
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!mounted) return;
-
-        if (event === 'SIGNED_OUT' || !session) {
-          setUser(null);
-          setUniversity(null);
-          if (event === 'SIGNED_OUT') {
-            setStudent(null);
-            setRole(null);
-            localStorage.removeItem('student_session');
-          }
-        } else if (session?.user) {
-          setUser(session.user);
-          await loadUserProfile(session.user);
-        }
-        
-        if (!student) {
-          setLoading(false);
+      (event, session) => {
+        if (event === "SIGNED_OUT") {
+          clearAuthState();
+        } else if (session) {
+           supabase.from('universities').select('*').eq('id', session.user.id).single()
+          .then(({ data, error }) => {
+            if (!error && data) {
+              setUser(session.user);
+              setUniversity(data);
+              setRole('university');
+            }
+          });
         }
       }
     );
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
+    return () => subscription.unsubscribe();
+  }, [clearAuthState]);
 
-  const loadUserProfile = async (user: User) => {
-    try {
-      const { data: universityData } = await supabase
-        .from('universities')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
 
-      if (universityData) {
-        setUniversity(universityData);
-        setRole('university');
-        setStudent(null);
-        localStorage.removeItem('student_session');
-      }
-    } catch (error) {
-      console.error('Error in loadUserProfile:', error);
-    }
-  };
+  // --- AUTHENTICATION FUNCTIONS ---
 
-  const signUpAsUniversity = async ({ name, email, password }: { name: string; email: string; password: string }) => {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-            role: 'university'
-          }
-        }
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        const { error: profileError } = await supabase
-          .from('universities')
-          .insert({
-            id: data.user.id,
-            name
-          });
-
-        if (profileError) {
-          throw profileError;
-        }
-      }
-    } catch (error) {
-      console.error('University signup error:', error);
-      throw error;
-    }
+  const signUpAsUniversity = async (data: { name: string; email: string; password: string }) => {
+    const { data: authData, error } = await supabase.auth.signUp({
+      email: data.email,
+      password: data.password,
+      options: { data: { name: data.name, role: 'university' } }
+    });
+    if (error) throw error;
+    return authData;
   };
 
   const loginAsUniversity = async ({ email, password }: { email: string; password: string }) => {
+    setLoading(true);
     try {
-      console.log('University login attempt:', email);
-      
-      // First, sign in with Supabase
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password: password
-      });
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      if (authError) throw authError;
 
-      if (authError) {
-        console.error('Auth error:', authError);
-        throw new Error(authError.message);
-      }
-
-      if (!authData.user) {
-        throw new Error('No user data returned');
-      }
-
-      console.log('Auth successful, checking university profile...');
-
-      // Check if this user has a university profile
-      const { data: universityData, error: universityError } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('universities')
         .select('*')
         .eq('id', authData.user.id)
-        .maybeSingle();
-
-      if (universityError) {
-        console.error('University query error:', universityError);
-        await supabase.auth.signOut();
-        throw new Error('Failed to verify university account');
-      }
-
-      if (!universityData) {
-        console.log('No university profile found');
-        await supabase.auth.signOut();
-        throw new Error('This account is not registered as a university');
-      }
-
-      console.log('University login successful:', universityData);
-
-      // Clear any student session
-      localStorage.removeItem('student_session');
+        .single();
       
-      // Set university state
+      if (profileError) throw profileError;
+
       setUser(authData.user);
-      setUniversity(universityData);
-      setStudent(null);
+      setUniversity(profile);
       setRole('university');
-      
-    } catch (error) {
-      console.error('University login error:', error);
-      throw error;
+      localStorage.removeItem('student_session');
+      return { user: authData.user, profile };
+    } finally {
+      setLoading(false);
     }
   };
 
   const loginAsStudent = async ({ email, rollNumber }: { email: string; rollNumber: string }) => {
+    setLoading(true);
     try {
-      console.log('Student login attempt:', email, rollNumber);
-      
-      // Clear any existing sessions
-      localStorage.removeItem('student_session');
-      if (user) {
-        await supabase.auth.signOut();
-      }
-      
-      // Query for student
+      await supabase.auth.signOut();
+      clearAuthState();
+
+      // Step 1: Find the student first.
       const { data: studentData, error: studentError } = await supabase
         .from('students')
-        .select(`
-          *,
-          universities!inner(
-            id,
-            name,
-            address
-          )
-        `)
-        .eq('student_email', email.trim())
+        .select('*')
+        .eq('student_email', email.trim().toLowerCase())
         .eq('student_roll_number', rollNumber.trim())
-        .maybeSingle();
+        .single();
 
-      if (studentError) {
-        console.error('Student query error:', studentError);
-        throw new Error('Failed to verify student credentials');
+      if (studentError || !studentData) {
+        console.error("Student lookup failed:", studentError?.message);
+        throw new Error("Invalid student credentials. Please check your email and roll number and try again.");
+      }
+      
+      // Step 2: If student is found, get their university details.
+      const { data: universityData, error: universityError } = await supabase
+        .from('universities')
+        .select('*')
+        .eq('id', studentData.university_id)
+        .single();
+      
+      // We can still log in the student even if the university lookup fails
+      if (universityError) {
+          console.warn("Could not fetch university for student:", universityError.message);
       }
 
-      if (!studentData) {
-        console.log('No student found with these credentials');
-        throw new Error('Invalid student credentials. Please check your email and roll number.');
-      }
+      // Step 3: Combine the data and set the state.
+      const fullStudentProfile = { ...studentData, university: universityData || undefined };
 
-      console.log('Student found:', studentData);
-      
-      // Store student session
-      localStorage.setItem('student_session', JSON.stringify(studentData));
-      
-      // Clear university state
-      setUser(null);
-      setUniversity(null);
-      
-      // Set student state
-      setStudent(studentData);
+      localStorage.setItem('student_session', JSON.stringify(fullStudentProfile));
+      setStudent(fullStudentProfile);
       setRole('student');
-      
-    } catch (error) {
-      console.error('Student login error:', error);
-      throw error;
+      return fullStudentProfile;
+
+    } catch(error) {
+        clearAuthState();
+        throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const signOut = async () => {
-    try {
-      console.log('Signing out...');
-      
-      // Clear student session
-      localStorage.removeItem('student_session');
-      
-      // Sign out from Supabase auth
-      if (user) {
-        await supabase.auth.signOut();
-      }
-
-      // Clear all state
-      setUser(null);
-      setStudent(null);
-      setUniversity(null);
-      setRole(null);
-      
-      console.log('Sign out complete');
-    } catch (error) {
-      console.error('Error in signOut:', error);
-    }
+    await supabase.auth.signOut();
+    clearAuthState();
   };
 
+  // The value provided to the context consumers
   const value = {
     user,
     student,
@@ -318,16 +205,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signOut,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+// Custom hook to use the auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;

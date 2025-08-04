@@ -8,61 +8,38 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rollNumber, setRollNumber] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { loginAsUniversity, loginAsStudent, role, user, student } = useAuth();
+  const { loginAsUniversity, loginAsStudent, role, loading } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect if already logged in
+  // This effect will run when the 'role' or 'loading' state changes.
+  // It handles navigation AFTER authentication is fully complete.
   useEffect(() => {
-    if (role === 'university' && user) {
-      navigate('/university/dashboard');
-    } else if (role === 'student' && student) {
-      navigate('/student/dashboard');
+    if (!loading && role) {
+      const destination = role === 'university' ? '/university/dashboard' : '/student/dashboard';
+      navigate(destination);
     }
-  }, [role, user, student, navigate]);
+  }, [role, loading, navigate]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!email.trim()) {
-      setError('Please enter your email address');
-      return;
-    }
-    
-    if (isUniversityLogin && !password.trim()) {
-      setError('Please enter your password');
-      return;
-    }
-    
-    if (!isUniversityLogin && !rollNumber.trim()) {
-      setError('Please enter your roll number');
-      return;
-    }
-    
-    setLoading(true);
+    setIsSubmitting(true);
     setError('');
     
     try {
-      console.log('Login attempt:', { isUniversityLogin, email: email.trim() });
-      
       if (isUniversityLogin) {
-        console.log('Attempting university login...');
-        await loginAsUniversity({ email: email.trim(), password });
-        console.log('University login successful, navigating...');
-        navigate('/university/dashboard');
+        await loginAsUniversity({ email, password });
       } else {
-        console.log('Attempting student login...');
-        await loginAsStudent({ email: email.trim(), rollNumber: rollNumber.trim() });
-        console.log('Student login successful, navigating...');
-        navigate('/student/dashboard');
+        await loginAsStudent({ email, rollNumber });
       }
+      // The useEffect hook above will handle the navigation.
     } catch (err: any) {
-      console.error('Login error:', err);
-      setError(err.message || 'Login failed. Please check your credentials and try again.');
+      setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -205,10 +182,10 @@ const Login = () => {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={isSubmitting}
               className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-4 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 shadow-2xl flex items-center justify-center"
             >
-              {loading ? (
+              {isSubmitting ? (
                 <>
                   <Loader2 className="animate-spin h-5 w-5 mr-2" />
                   Signing in...

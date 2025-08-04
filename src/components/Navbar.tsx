@@ -10,9 +10,9 @@ const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
+    setMobileMenuOpen(false);
     await signOut();
     navigate('/');
-    setMobileMenuOpen(false);
   };
 
   const getDashboardPath = () => {
@@ -22,6 +22,16 @@ const Navbar = () => {
   };
 
   const isLoggedIn = role && (university || student);
+  
+  const getUserDisplayName = () => {
+    if (role === 'university' && university) {
+      return university.name;
+    }
+    if (role === 'student' && student) {
+      return student.student_name;
+    }
+    return 'User';
+  };
 
   return (
     <nav className="bg-white/95 backdrop-blur-lg shadow-xl border-b border-gray-200/50 sticky top-0 z-50">
@@ -49,14 +59,14 @@ const Navbar = () => {
                       <>
                         <Building2 className="h-5 w-5 text-blue-600" />
                         <span className="text-sm font-semibold text-gray-700">
-                          {university?.name || 'University'}
+                          {getUserDisplayName()}
                         </span>
                       </>
                     ) : (
                       <>
                         <User className="h-5 w-5 text-green-600" />
                         <span className="text-sm font-semibold text-gray-700">
-                          {student?.student_name || 'Student'}
+                          {getUserDisplayName()}
                         </span>
                       </>
                     )}
@@ -127,14 +137,14 @@ const Navbar = () => {
                         <>
                           <Building2 className="h-4 w-4 text-blue-600" />
                           <span className="text-sm font-medium text-gray-700">
-                            {university?.name || 'University'}
+                            {getUserDisplayName()}
                           </span>
                         </>
                       ) : (
                         <>
                           <User className="h-4 w-4 text-green-600" />
                           <span className="text-sm font-medium text-gray-700">
-                            {student?.student_name || 'Student'}
+                            {getUserDisplayName()}
                           </span>
                         </>
                       )}

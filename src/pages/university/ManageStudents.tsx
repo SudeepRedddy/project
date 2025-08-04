@@ -45,10 +45,11 @@ const ManageStudents = () => {
 
         setAddingStudent(true);
         try {
+            // The only change is adding .toLowerCase() to the email
             const { error } = await supabase.from('students').insert({
                 university_id: user.id,
                 student_name: newStudentName.trim(),
-                student_email: newStudentEmail.trim(),
+                student_email: newStudentEmail.trim().toLowerCase(), // <-- ADD THIS
                 student_roll_number: newStudentRoll.trim()
             });
             

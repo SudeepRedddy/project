@@ -1,8 +1,61 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Shield, LogIn, Award, CheckCircle, Globe, Lock, Users, Zap, Star } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 const Home = () => {
+  const { role } = useAuth();
+  
+  // If user is logged in, show different content
+  if (role) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+        {/* Animated background elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-pulse"></div>
+          <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-pulse animation-delay-2000"></div>
+          <div className="absolute bottom-1/4 left-1/3 w-96 h-96 bg-indigo-500 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-pulse animation-delay-4000"></div>
+        </div>
+
+        {/* Hero Section for Logged In Users */}
+        <div className="relative max-w-7xl mx-auto px-4 py-20">
+          <div className="text-center mb-20">
+            <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full mb-8 shadow-2xl">
+              <Award className="h-12 w-12 text-white" />
+            </div>
+            <h1 className="text-6xl sm:text-7xl font-bold text-white mb-8 leading-tight">
+              Welcome back to <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Certify</span>
+            </h1>
+            <p className="text-xl text-gray-300 max-w-4xl mx-auto leading-relaxed mb-12">
+              {role === 'university' 
+                ? 'Manage your students and issue blockchain-verified certificates with ease.'
+                : 'View and download your verified certificates from the blockchain.'
+              }
+            </p>
+            
+            {/* CTA Buttons for Logged In Users */}
+            <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
+              <Link
+                to={role === 'university' ? '/university/dashboard' : '/student/dashboard'}
+                className="group inline-flex items-center bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-8 py-4 rounded-2xl hover:from-blue-600 hover:to-indigo-600 font-semibold transition-all duration-300 transform hover:scale-105 shadow-2xl"
+              >
+                <Award className="h-6 w-6 mr-3 group-hover:rotate-12 transition-transform" />
+                Go to Dashboard
+              </Link>
+              <Link
+                to="/verify"
+                className="group inline-flex items-center bg-white/10 backdrop-blur-sm text-white px-8 py-4 rounded-2xl hover:bg-white/20 font-semibold transition-all duration-300 transform hover:scale-105 shadow-2xl border border-white/20"
+              >
+                <Search className="h-6 w-6 mr-3 group-hover:rotate-12 transition-transform" />
+                Verify Certificate
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
       {/* Animated background elements */}
