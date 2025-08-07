@@ -19,7 +19,6 @@ const getImageDataUri = async (url: string): Promise<string | null> => {
   }
 };
 
-
 export const generateCertificatePDF = async (certificate: {
   certificate_id: string;
   student_name: string;
@@ -27,7 +26,7 @@ export const generateCertificatePDF = async (certificate: {
   university: string;
   created_at: string;
   grade?: string;
-  logoUrl?: string; // <-- New optional parameter for the logo
+  logoUrl?: string;
 }) => {
   try {
     const pdf = new jsPDF('l', 'mm', 'a4');
@@ -55,26 +54,22 @@ export const generateCertificatePDF = async (certificate: {
     pdf.line(10, pageHeight - 20, 20, pageHeight - 10);
     pdf.line(pageWidth - 10, pageHeight - 20, pageWidth - 20, pageHeight - 10);
 
-
-    // 2. University Logo (Dynamically Fetched)
+    // 2. University Logo (Top-left corner)
     if (certificate.logoUrl) {
       const imageDataUri = await getImageDataUri(certificate.logoUrl);
       if (imageDataUri) {
-        // Center the logo
         const imgProps = pdf.getImageProperties(imageDataUri);
         const imgWidth = 30;
         const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-        pdf.addImage(imageDataUri, 'PNG', (pageWidth - imgWidth) / 2, 20, imgWidth, imgHeight);
+        pdf.addImage(imageDataUri, 'PNG', 15, 15, imgWidth, imgHeight); // Top-left corner
       }
     }
-
 
     // 3. Certificate Title
     pdf.setFont('Helvetica', 'bold');
     pdf.setFontSize(34);
     pdf.setTextColor(primaryColor);
     pdf.text('Certificate of Achievement', pageWidth / 2, 60, { align: 'center' });
-
 
     // 4. Main Content
     pdf.setFont('Helvetica', 'normal');
@@ -100,10 +95,10 @@ export const generateCertificatePDF = async (certificate: {
     pdf.text(certificate.course, pageWidth / 2, 122, { align: 'center' });
 
     if (certificate.grade) {
-       pdf.setFont('Helvetica', 'normal');
-       pdf.setFontSize(12);
-       pdf.setTextColor(textColor);
-       pdf.text(`with a final grade of: ${certificate.grade}`, pageWidth / 2, 132, { align: 'center' });
+      pdf.setFont('Helvetica', 'normal');
+      pdf.setFontSize(12);
+      pdf.setTextColor(textColor);
+      pdf.text(`with a final grade of: ${certificate.grade}`, pageWidth / 2, 132, { align: 'center' });
     }
 
     // 5. Issuing University & Date
@@ -118,10 +113,15 @@ export const generateCertificatePDF = async (certificate: {
     pdf.setTextColor(textColor);
     pdf.text(`Issued by ${certificate.university} on ${issueDate}`, pageWidth / 2, 150, { align: 'center' });
 
-
     // 6. QR Code & Certificate ID
-    const qrData = `${window.location.origin}/verify?id=${certificate.certificate_id}`;
-    const qrCodeDataUrl = await QRCode.toDataURL(qrData);
+    const qrText = `Certificate ID: ${certificate.certificate_id}
+Student Name: ${certificate.student_name}
+Course: ${certificate.course}
+University: ${certificate.university}
+Issued On: ${issueDate}
+${certificate.grade ? `Grade: ${certificate.grade}` : ''}`;
+
+    const qrCodeDataUrl = await QRCode.toDataURL(qrText);
     const qrSize = 30;
     pdf.addImage(qrCodeDataUrl, 'PNG', 20, pageHeight - qrSize - 15, qrSize, qrSize);
 
@@ -132,13 +132,11 @@ export const generateCertificatePDF = async (certificate: {
     pdf.setFont('Helvetica', 'bold');
     pdf.text(certificate.certificate_id, pageWidth - 55, pageHeight - 20);
 
-
     return pdf;
   } catch (error) {
     console.error('Error generating PDF:', error);
-    // Return a blank PDF with an error message if something goes wrong
     const errorPdf = new jsPDF();
-    errorPdf.text("Failed to generate certificate.", 10, 10);
+    errorPdf.text('Failed to generate certificate.', 10, 10);
     return errorPdf;
   }
 };

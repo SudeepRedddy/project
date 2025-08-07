@@ -239,6 +239,19 @@ const certificateContractABI = [
 ];
 
 const CONTRACT_ADDRESS = '0xD2afa4f1a7D4Bd0b8Aff8496dDFa5332DA423ee2';
+const SEPOLIA_CHAIN_ID = '0xaa36a7'; // 11155111 in hex
+const SEPOLIA_NETWORK_CONFIG = {
+  chainId: SEPOLIA_CHAIN_ID,
+  chainName: 'Sepolia test network',
+  nativeCurrency: {
+    name: 'SepoliaETH',
+    symbol: 'ETH',
+    decimals: 18,
+  },
+  rpcUrls: ['https://sepolia.infura.io/v3/', 'https://rpc.sepolia.org'],
+  blockExplorerUrls: ['https://sepolia.etherscan.io/'],
+};
+
 const PUBLIC_RPC_ENDPOINTS = [
   'https://eth-sepolia.public.blastapi.io',
   'https://rpc.sepolia.org',
@@ -252,6 +265,52 @@ let web3Initialized = false;
 
 export const isMetaMaskInstalled = (): boolean => {
   return typeof window !== 'undefined' && window.ethereum !== undefined;
+};
+
+// Check if user is on Sepolia network
+export const isOnSepoliaNetwork = async (): Promise<boolean> => {
+  if (!isMetaMaskInstalled()) return false;
+  
+  try {
+    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+    return chainId === SEPOLIA_CHAIN_ID;
+  } catch (error) {
+    console.error('Error checking network:', error);
+    return false;
+  }
+};
+
+// Switch to Sepolia network
+export const switchToSepoliaNetwork = async (): Promise<boolean> => {
+  if (!isMetaMaskInstalled()) {
+    throw new Error('MetaMask is not installed');
+  }
+
+  try {
+    // Try to switch to Sepolia
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: SEPOLIA_CHAIN_ID }],
+    });
+    return true;
+  } catch (switchError: any) {
+    // This error code indicates that the chain has not been added to MetaMask.
+    if (switchError.code === 4902) {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [SEPOLIA_NETWORK_CONFIG],
+        });
+        return true;
+      } catch (addError) {
+        console.error('Error adding Sepolia network:', addError);
+        throw new Error('Failed to add Sepolia network to MetaMask');
+      }
+    } else {
+      console.error('Error switching to Sepolia:', switchError);
+      throw new Error('Failed to switch to Sepolia network');
+    }
+  }
 };
 
 const initFallbackProvider = async (): Promise<boolean> => {
@@ -299,7 +358,14 @@ export const connectWallet = async (): Promise<string | null> => {
   if (!isMetaMaskInstalled()) {
     throw new Error("MetaMask is not installed.");
   }
+
   try {
+    // First, ensure we're on the correct network
+    const isOnSepolia = await isOnSepoliaNetwork();
+    if (!isOnSepolia) {
+      await switchToSepoliaNetwork();
+    }
+
     const browserProvider = new ethers.BrowserProvider(window.ethereum);
     const accounts = await browserProvider.send("eth_requestAccounts", []);
     const signer = await browserProvider.getSigner();
@@ -336,17 +402,64 @@ export const issueCertificateOnBlockchain = async (
   course: string,
   university: string
 ): Promise<any> => {
-  if (!provider || !contract || !(provider instanceof ethers.BrowserProvider)) {
-    throw new Error('MetaMask is not connected. Please connect your wallet.');
+  // Ensure MetaMask is connected and on the right network
+  if (!isMetaMaskInstalled()) {
+    throw new Error('MetaMask is not installed.');
   }
+
+  // Check if we're on Sepolia network
+  const isOnSepolia = await isOnSepoliaNetwork();
+  if (!isOnSepolia) {
+    throw new Error('Please switch to Sepolia testnet in MetaMask.');
+  }
+
+  // Ensure wallet is connected
+  if (!provider || !contract || !(provider instanceof ethers.BrowserProvider)) {
+    // Try to connect wallet first
+    await connectWallet();
+    if (!provider || !contract) {
+      throw new Error('Failed to connect to MetaMask. Please try again.');
+    }
+  }
+
   try {
     const signer = await provider.getSigner();
     const contractWithSigner = contract.connect(signer) as ethers.Contract;
-    const tx = await contractWithSigner.issueCertificate(certificateId, studentId, studentName, course, university);
+    
+    // Estimate gas first to catch any errors early
+    const gasEstimate = await contractWithSigner.issueCertificate.estimateGas(
+      certificateId, 
+      studentId, 
+      studentName, 
+      course, 
+      university
+    );
+    
+    const tx = await contractWithSigner.issueCertificate(
+      certificateId, 
+      studentId, 
+      studentName, 
+      course, 
+      university,
+      {
+        gasLimit: Math.floor(Number(gasEstimate) * 1.2) // Add 20% buffer
+      }
+    );
+    
     const receipt = await tx.wait();
     return receipt;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error issuing certificate:', error);
+    
+    // Handle specific error cases
+    if (error.code === 4001) {
+      throw new Error('Transaction was rejected by user.');
+    } else if (error.code === -32603 && error.message.includes('insufficient funds')) {
+      throw new Error('Insufficient ETH balance for gas fees. Please add Sepolia ETH to your wallet.');
+    } else if (error.message.includes('Certificate with this ID already exists')) {
+      throw new Error('Certificate with this ID already exists on the blockchain.');
+    }
+    
     throw error;
   }
 };

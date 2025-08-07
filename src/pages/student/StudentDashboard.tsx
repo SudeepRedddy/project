@@ -36,7 +36,8 @@ const StudentDashboard = () => {
     const downloadCertificate = async (certificate: any) => {
         try {
             setDownloadingId(certificate.certificate_id);
-            const pdf = await generateCertificatePDF(certificate);
+            const logoUrl = student?.university?.logo_url;
+            const pdf = await generateCertificatePDF({ ...certificate, logoUrl });
             pdf.save(`${certificate.student_name.replace(/\s+/g, '_')}_${certificate.course.replace(/\s+/g, '_')}_Certificate.pdf`);
         } catch (err) {
             console.error('Error downloading certificate:', err);

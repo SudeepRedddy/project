@@ -94,99 +94,137 @@ const GenerateCertificate = () => {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const selectedStudent = students.find(s => s.id === selectedStudentId);
-    if (!selectedStudent || !course || !grade || !university) {
-        setError('Please fill out all fields before generating.');
-        return;
+  e.preventDefault();
+  const selectedStudent = students.find(s => s.id === selectedStudentId);
+  if (!selectedStudent || !course || !grade || !university) {
+      setError('Please fill out all fields before generating.');
+      return;
+  }
+
+  setLoading(true);
+  setError('');
+  setSuccess(false);
+  setPreviewUrl(null);
+  setBlockchainStatus(null);
+  setBlockchainTxHash(null);
+
+  try {
+    if (!isWeb3Initialized()) {
+      await initWeb3();
     }
 
-    setLoading(true);
-    setError('');
-    setSuccess(false);
-    setPreviewUrl(null);
-    setBlockchainStatus(null);
-    setBlockchainTxHash(null);
+    const isDuplicate = await checkDuplicateCertificate(selectedStudent.id, course);
+    if (isDuplicate) {
+      throw new Error('A certificate for this student and course already exists.');
+    }
 
-    try {
-      if (!isWeb3Initialized()) {
-        await initWeb3();
-      }
+    const newCertificateId = generateCertificateId(
+      selectedStudent.student_roll_number,
+      selectedStudent.student_name,
+      course,
+      university.name
+    );
+    setCertificateId(newCertificateId);
 
-      const isDuplicate = await checkDuplicateCertificate(selectedStudent.id, course);
-      if (isDuplicate) {
-        throw new Error('A certificate for this student and course already exists.');
-      }
+    // Generate the PDF using the updated function, passing the logo URL
+    const pdf = await generateCertificatePDF({
+      certificate_id: newCertificateId,
+      student_name: selectedStudent.student_name,
+      course: course,
+      university: university.name,
+      created_at: new Date().toISOString(),
+      grade: grade,
+      logoUrl: university.logo_url // Pass the dynamic logo URL here
+    });
+    const pdfBlob = pdf.output('blob');
+    const previewUrl = URL.createObjectURL(pdfBlob);
+    setPreviewUrl(previewUrl);
 
-      const newCertificateId = generateCertificateId(
-        selectedStudent.student_roll_number,
-        selectedStudent.student_name,
-        course,
-        university.name
-      );
-      setCertificateId(newCertificateId);
+    // Prepare certificate data for insertion
+    const certificateData = {
+      certificate_id: newCertificateId,
+      student_id: selectedStudent.student_roll_number,
+      student_name: selectedStudent.student_name,
+      course: course,
+      university: university.name,
+      grade: grade,
+      university_id: user?.id,
+      student_id_ref: selectedStudent.id,
+      blockchain_verified: false,
+      blockchain_tx_hash: null,
+    };
 
-      // Generate the PDF using the updated function, passing the logo URL
-      const pdf = await generateCertificatePDF({
-        certificate_id: newCertificateId,
-        student_name: selectedStudent.student_name,
-        course: course,
-        university: university.name,
-        created_at: new Date().toISOString(),
-        grade: grade,
-        logoUrl: university.logo_url // Pass the dynamic logo URL here
-      });
-      const pdfBlob = pdf.output('blob');
-      const previewUrl = URL.createObjectURL(pdfBlob);
-      setPreviewUrl(previewUrl);
-
-      // Prepare certificate data for insertion
-      const certificateData = {
-        certificate_id: newCertificateId,
-        student_id: selectedStudent.student_roll_number,
-        student_name: selectedStudent.student_name,
-        course: course,
-        university: university.name,
-        grade: grade,
-        university_id: user?.id,
-        student_id_ref: selectedStudent.id,
-        blockchain_verified: false,
-        blockchain_tx_hash: null,
-      };
-
-      if (hasMetaMask) {
-        setBlockchainStatus('pending');
-        try {
-          const receipt = await issueCertificateOnBlockchain(
-            newCertificateId,
-            selectedStudent.student_roll_number,
-            selectedStudent.student_name,
-            course,
-            university.name
-          );
-          setBlockchainStatus('success');
-          setBlockchainTxHash(receipt.transactionHash);
-          certificateData.blockchain_tx_hash = receipt.transactionHash;
-          certificateData.blockchain_verified = true;
-        } catch (blockchainError: any) {
-          console.error('Blockchain error:', blockchainError);
-          setBlockchainStatus('error');
+    if (hasMetaMask) {
+      setBlockchainStatus('pending');
+      try {
+        // Import the new functions
+        const { connectWallet, isOnSepoliaNetwork, switchToSepoliaNetwork } = await import('../../lib/blockchain');
+        
+        // Check if on correct network
+        const isOnSepolia = await isOnSepoliaNetwork();
+        if (!isOnSepolia) {
+          // Try to switch networks
+          try {
+            await switchToSepoliaNetwork();
+          } catch (networkError: any) {
+            throw new Error('Please switch to Sepolia testnet in MetaMask to continue.');
+          }
         }
-      } else {
-        setBlockchainStatus('error');
-      }
 
-      const { error: dbError } = await supabase.from('certificates').insert(certificateData);
-      if (dbError) throw new Error('Failed to save certificate to database: ' + dbError.message);
-      
-      setSuccess(true);
-    } catch (err: any) {
-      setError(err.message || 'Failed to generate certificate. Please try again.');
-      console.error(err);
-    } finally {
-      setLoading(false);
+        // Connect wallet if not already connected
+        try {
+          await connectWallet();
+        } catch (walletError: any) {
+          if (walletError.message.includes('rejected')) {
+            throw new Error('Wallet connection was rejected. Please connect your MetaMask wallet.');
+          }
+          throw walletError;
+        }
+
+        const receipt = await issueCertificateOnBlockchain(
+          newCertificateId,
+          selectedStudent.student_roll_number,
+          selectedStudent.student_name,
+          course,
+          university.name
+        );
+        setBlockchainStatus('success');
+        setBlockchainTxHash(receipt.transactionHash);
+        certificateData.blockchain_tx_hash = receipt.transactionHash;
+        certificateData.blockchain_verified = true;
+      } catch (blockchainError: any) {
+        console.error('Blockchain error:', blockchainError);
+        setBlockchainStatus('error');
+        
+        // Set more specific error messages
+        if (blockchainError.message.includes('Sepolia')) {
+          setError('Please switch to Sepolia testnet in MetaMask and try again.');
+        } else if (blockchainError.message.includes('insufficient funds')) {
+          setError('Insufficient Sepolia ETH for gas fees. Please get test ETH from a faucet.');
+        } else if (blockchainError.message.includes('rejected')) {
+          setError('Transaction was rejected. The certificate was saved to database but not verified on blockchain.');
+        } else {
+          setError(`Blockchain error: ${blockchainError.message}`);
+        }
+        
+        // Continue with database save even if blockchain fails
+      }
+    } else {
+      setBlockchainStatus('error');
+      setError('MetaMask is not installed. Certificate will be saved to database only.');
     }
-  };
+
+    const { error: dbError } = await supabase.from('certificates').insert(certificateData);
+    if (dbError) throw new Error('Failed to save certificate to database: ' + dbError.message);
+    
+    setSuccess(true);
+  } catch (err: any) {
+    setError(err.message || 'Failed to generate certificate. Please try again.');
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const resetForm = () => {
     setPreviewUrl(null);
