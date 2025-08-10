@@ -41,13 +41,16 @@ export const generateCertificatePDF = async (certificate: {
     pdf.setLineWidth(1);
     pdf.rect(14, 14, pageWidth - 28, pageHeight - 28);
 
-    // ✨ University Logo (Top Center) - use custom logo if provided
-    const logoToUse = certificate.logoUrl || logoImage;
+    // ✨ University Logo (Top Center) - with improved error handling
     try {
-      pdf.addImage(logoToUse, 'PNG', pageWidth / 2 - 20, 20, 40, 30);
+      const logoToUse = certificate.logoUrl || logoImage;
+      if (logoToUse) {
+        pdf.addImage(logoToUse, 'PNG', pageWidth / 2 - 20, 20, 40, 30);
+      }
     } catch (logoError) {
-      console.warn('Failed to load custom logo, using default:', logoError);
-      pdf.addImage(logoImage, 'PNG', pageWidth / 2 - 20, 20, 40, 30);
+      console.warn('Could not add logo to PDF, continuing without it:', logoError);
+      // If adding the logo fails, just log a warning and proceed
+      // This prevents the entire PDF generation from failing.
     }
 
     // 🎓 University Name
@@ -152,7 +155,7 @@ export const generateCertificateWithIPFS = async (certificate: any): Promise<{ p
   try {
     const pdf = await generateCertificatePDF(certificate);
     const pdfBlob = pdf.output('blob');
-    
+
     // Try to upload to IPFS
     try {
       const ipfsResult = await uploadToIPFS(pdfBlob, `certificate_${certificate.certificate_id}.pdf`);
@@ -180,13 +183,13 @@ export const exportCertificateAs = async (certificate: any, format: 'pdf' | 'png
   switch (format) {
     case 'pdf':
       return await generateCertificatePDF(certificate);
-      
+
     case 'png':
       const pdf = await generateCertificatePDF(certificate);
       // Convert PDF to PNG (this would require additional libraries like pdf2pic)
       // For now, we'll return the PDF
       return pdf;
-      
+
     case 'json':
       // Return certificate data as JSON
       const jsonData = {
@@ -201,7 +204,7 @@ export const exportCertificateAs = async (certificate: any, format: 'pdf' | 'png
         verification_url: `${window.location.origin}/verify`,
         public_url: certificate.public_share_id ? `${window.location.origin}/certificate/${certificate.public_share_id}` : null
       };
-      
+
       const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -211,9 +214,9 @@ export const exportCertificateAs = async (certificate: any, format: 'pdf' | 'png
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      
+
       return null; // JSON download is handled directly
-      
+
     default:
       throw new Error('Unsupported export format');
   }
