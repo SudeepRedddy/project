@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
-import logoImage from './logo.png'; // Local image (PNG)
+import logoImage from './logo.png'; // Local logo
 
 export const generateCertificatePDF = async (certificate: {
   certificate_id: string;
@@ -15,107 +15,114 @@ export const generateCertificatePDF = async (certificate: {
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
 
-    // --- Color & Style Setup ---
-    const primaryColor = '#0D2B4D'; // Deep Navy
-    const secondaryColor = '#D4AF37'; // Gold
-    const textColor = '#333333'; // Charcoal Gray
-    const backgroundColor = '#FDFDFD'; // Clean off-white
+    // 🎨 Color Palette
+    const primaryColor = '#1B365D'; // Deep Navy Blue
+    const secondaryColor = '#B08D57'; // Elegant Gold
+    const textColor = '#2C2C2C';
+    const backgroundColor = '#FAF9F6'; // Soft cream white
 
-    // --- Background & Border ---
+    // 🖼 Background
     pdf.setFillColor(backgroundColor);
     pdf.rect(0, 0, pageWidth, pageHeight, 'F');
-    pdf.setDrawColor(primaryColor);
-    pdf.setLineWidth(1.5);
-    pdf.rect(10, 10, pageWidth - 20, pageHeight - 20);
 
-    // Decorative corner lines
+    // 🖌 Double Border for Premium Look
     pdf.setDrawColor(secondaryColor);
-    pdf.setLineWidth(0.5);
-    pdf.line(10, 20, 20, 10);
-    pdf.line(pageWidth - 20, 10, pageWidth - 10, 20);
-    pdf.line(10, pageHeight - 20, 20, pageHeight - 10);
-    pdf.line(pageWidth - 10, pageHeight - 20, pageWidth - 20, pageHeight - 10);
+    pdf.setLineWidth(4);
+    pdf.rect(8, 8, pageWidth - 16, pageHeight - 16);
+    pdf.setDrawColor(primaryColor);
+    pdf.setLineWidth(1);
+    pdf.rect(14, 14, pageWidth - 28, pageHeight - 28);
 
-    // --- University Logo (Top Left) ---
-    pdf.addImage(logoImage, 'PNG', 15, 15, 40, 30);
+    // ✨ University Logo (Top Center)
+    pdf.addImage(logoImage, 'PNG', pageWidth / 2 - 20, 20, 40, 30);
 
-    // --- University Name (Top Center) ---
+    // 🎓 University Name
     pdf.setFont('Helvetica', 'bold');
-    pdf.setFontSize(20);
+    pdf.setFontSize(22);
     pdf.setTextColor(primaryColor);
-    pdf.text(certificate.university.toUpperCase(), pageWidth / 2 , 25, { align: 'center' });
-    pdf.setFontSize(12)
-    pdf.text('(UGC AUTONOMOUS)', pageWidth / 2 , 33, { align: 'center' });
-    pdf.text('Kandlakoya, Medchal Road, Hyderabad 501401', pageWidth / 2 , 38, { align: 'center' });
-    
-    // --- Certificate Title ---
-    pdf.setFont('Helvetica', 'bold');
-    pdf.setFontSize(32);
-    pdf.setTextColor(secondaryColor);
-    pdf.text('Certificate of Achievement', pageWidth / 2, 65, { align: 'center' });
+    pdf.text(certificate.university.toUpperCase(), pageWidth / 2, 65, { align: 'center' });
 
-    // --- Statement ---
-    pdf.setFont('Times', 'italic');
-    pdf.setFontSize(14);
+    pdf.setFontSize(12);
     pdf.setTextColor(textColor);
-    pdf.text('This certifies that', pageWidth / 2, 85, { align: 'center' });
+    pdf.text('(UGC AUTONOMOUS)', pageWidth / 2, 73, { align: 'center' });
+    pdf.text('Kandlakoya, Medchal Road, Hyderabad 501401', pageWidth / 2, 80, { align: 'center' });
 
-    // --- Student Name ---
+    // 🏆 Certificate Title
     pdf.setFont('Times', 'bold');
-    pdf.setFontSize(26);
-    pdf.setTextColor(primaryColor);
-    pdf.text(certificate.student_name, pageWidth / 2, 100, { align: 'center' });
+    pdf.setFontSize(36);
+    pdf.setTextColor(secondaryColor);
+    pdf.text('Certificate of Achievement', pageWidth / 2, 105, { align: 'center' });
 
-    // --- Course Completion Statement ---
+    // 📜 Intro Text
+    pdf.setFont('Times', 'italic');
+    pdf.setFontSize(16);
+    pdf.setTextColor(textColor);
+    pdf.text('This is proudly presented to', pageWidth / 2, 120, { align: 'center' });
+
+    // 🖊 Student Name
+    pdf.setFont('Helvetica', 'bold');
+    pdf.setFontSize(28);
+    pdf.setTextColor(primaryColor);
+    pdf.text(certificate.student_name, pageWidth / 2, 137, { align: 'center' });
+
+    // 📚 Course Statement
     pdf.setFont('Times', 'normal');
     pdf.setFontSize(14);
-    pdf.text('has successfully completed the course', pageWidth / 2, 115, { align: 'center' });
+    pdf.setTextColor(textColor);
+    pdf.text('for successfully completing the course', pageWidth / 2, 150, { align: 'center' });
 
-    // --- Course Name ---
+    // 📌 Course Name
     pdf.setFont('Helvetica', 'bold');
     pdf.setFontSize(20);
     pdf.setTextColor(secondaryColor);
-    pdf.text(certificate.course, pageWidth / 2, 127, { align: 'center' });
+    pdf.text(certificate.course, pageWidth / 2, 162, { align: 'center' });
 
-    // --- Grade (if present) ---
+    // 📈 Grade (optional)
     if (certificate.grade) {
       pdf.setFont('Helvetica', 'normal');
       pdf.setFontSize(12);
       pdf.setTextColor(textColor);
-      pdf.text(`with a final grade of: ${certificate.grade}`, pageWidth / 2, 138, { align: 'center' });
+      pdf.text(`with a final grade of: ${certificate.grade}`, pageWidth / 2, 172, { align: 'center' });
     }
 
-    // --- Issue Date ---
+    // 📅 Issue Date
     const issueDate = new Date(certificate.created_at).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
-
-    pdf.setFont('Times', 'normal');
+    pdf.setFont('Times', 'italic');
     pdf.setFontSize(12);
-    pdf.setTextColor(textColor);
-    pdf.text(`Issued on ${issueDate}`, pageWidth / 2, 150, { align: 'center' });
+    pdf.text(`Issued on ${issueDate}`, pageWidth / 2, 182, { align: 'center' });
 
-    // --- QR Code ---
+    // 🔗 QR Code (Bottom Left)
     const qrText = `Certificate ID: ${certificate.certificate_id}
-    Student Name: ${certificate.student_name}
-    Course: ${certificate.course}
-    University: ${certificate.university}
-    Issued On: ${issueDate}
-    ${certificate.grade ? `Grade: ${certificate.grade}` : ''}`;
-
+Student Name: ${certificate.student_name}
+Course: ${certificate.course}
+University: ${certificate.university}
+Issued On: ${issueDate}
+${certificate.grade ? `Grade: ${certificate.grade}` : ''}`;
     const qrCodeDataUrl = await QRCode.toDataURL(qrText);
     const qrSize = 30;
     pdf.addImage(qrCodeDataUrl, 'PNG', 25, pageHeight - qrSize - 25, qrSize, qrSize);
 
-    // --- Certificate ID ---
+    // 🆔 Certificate ID (Bottom Right)
     pdf.setFont('Helvetica', 'normal');
-    pdf.setFontSize(12);
-    pdf.setTextColor(textColor);
-    pdf.text('Certificate ID:', pageWidth - 55, pageHeight - 35);
+    pdf.setFontSize(10);
+    pdf.text('Certificate ID:', pageWidth - 60, pageHeight - 28);
     pdf.setFont('Helvetica', 'bold');
-    pdf.text(certificate.certificate_id, pageWidth - 55, pageHeight - 30);
+    pdf.text(certificate.certificate_id, pageWidth - 60, pageHeight - 22);
+
+    // 🖋 Signature Lines
+    pdf.setDrawColor(primaryColor);
+    pdf.setLineWidth(0.5);
+    pdf.line(60, pageHeight - 40, 110, pageHeight - 40);
+    pdf.line(pageWidth - 110, pageHeight - 40, pageWidth - 60, pageHeight - 40);
+
+    pdf.setFontSize(10);
+    pdf.setTextColor(textColor);
+    pdf.text('Authorized Signatory', 85, pageHeight - 35, { align: 'center' });
+    pdf.text('Head of Department', pageWidth - 85, pageHeight - 35, { align: 'center' });
 
     return pdf;
   } catch (error) {
