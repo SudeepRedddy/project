@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
-import logoImage from './logo.png'; // Local logo
+import logoImage from './logo.png';
+import { uploadToIPFS, uploadToPublicIPFS } from './ipfs';
 
 export const generateCertificatePDF = async (certificate: {
   certificate_id: string;
@@ -9,17 +10,24 @@ export const generateCertificatePDF = async (certificate: {
   university: string;
   created_at: string;
   grade?: string;
+  logoUrl?: string;
+  template_data?: any;
+  colors?: {
+    primary: string;
+    secondary: string;
+    background: string;
+  };
 }) => {
   try {
     const pdf = new jsPDF('l', 'mm', 'a4');
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
 
-    // 🎨 Color Palette
-    const primaryColor = '#1B365D'; // Deep Navy Blue
-    const secondaryColor = '#B08D57'; // Elegant Gold
+    // 🎨 Color Palette (use custom colors if provided)
+    const primaryColor = certificate.colors?.primary || certificate.template_data?.colors?.primary || '#1B365D';
+    const secondaryColor = certificate.colors?.secondary || certificate.template_data?.colors?.secondary || '#B08D57';
+    const backgroundColor = certificate.colors?.background || certificate.template_data?.colors?.background || '#FAF9F6';
     const textColor = '#2C2C2C';
-    const backgroundColor = '#FAF9F6'; // Soft cream white
 
     // 🖼 Background
     pdf.setFillColor(backgroundColor);
@@ -33,8 +41,14 @@ export const generateCertificatePDF = async (certificate: {
     pdf.setLineWidth(1);
     pdf.rect(14, 14, pageWidth - 28, pageHeight - 28);
 
-    // ✨ University Logo (Top Center)
-    pdf.addImage(logoImage, 'PNG', pageWidth / 2 - 20, 20, 40, 30);
+    // ✨ University Logo (Top Center) - use custom logo if provided
+    const logoToUse = certificate.logoUrl || logoImage;
+    try {
+      pdf.addImage(logoToUse, 'PNG', pageWidth / 2 - 20, 20, 40, 30);
+    } catch (logoError) {
+      console.warn('Failed to load custom logo, using default:', logoError);
+      pdf.addImage(logoImage, 'PNG', pageWidth / 2 - 20, 20, 40, 30);
+    }
 
     // 🎓 University Name
     pdf.setFont('Helvetica', 'bold');
@@ -127,8 +141,80 @@ ${certificate.grade ? `Grade: ${certificate.grade}` : ''}`;
     return pdf;
   } catch (error) {
     console.error('Error generating PDF:', error);
-    const errorPdf = new jsPDF();
-    errorPdf.text('Failed to generate certificate.', 10, 10);
-    return errorPdf;
+    // Return a basic PDF on error
+    const fallbackPdf = new jsPDF('l', 'mm', 'a4');
+    fallbackPdf.text('Certificate generation failed. Please try again.', 20, 20);
+    return fallbackPdf;
+  }
+};
+
+export const generateCertificateWithIPFS = async (certificate: any): Promise<{ pdf: jsPDF; ipfsHash?: string }> => {
+  try {
+    const pdf = await generateCertificatePDF(certificate);
+    const pdfBlob = pdf.output('blob');
+    
+    // Try to upload to IPFS
+    try {
+      const ipfsResult = await uploadToIPFS(pdfBlob, `certificate_${certificate.certificate_id}.pdf`);
+      return { pdf, ipfsHash: ipfsResult.hash };
+    } catch (ipfsError) {
+      console.warn('IPFS upload failed, trying public IPFS:', ipfsError);
+      try {
+        const publicIpfsResult = await uploadToPublicIPFS(pdfBlob, `certificate_${certificate.certificate_id}.pdf`);
+        return { pdf, ipfsHash: publicIpfsResult.hash };
+      } catch (publicIpfsError) {
+        console.warn('Public IPFS upload also failed:', publicIpfsError);
+        return { pdf }; // Return PDF without IPFS
+      }
+    }
+  } catch (error) {
+    console.error('Error generating certificate with IPFS:', error);
+    const fallbackPdf = new jsPDF();
+    fallbackPdf.text('Certificate generation failed.', 10, 10);
+    return { pdf: fallbackPdf };
+  }
+};
+
+// Export certificate in different formats
+export const exportCertificateAs = async (certificate: any, format: 'pdf' | 'png' | 'json') => {
+  switch (format) {
+    case 'pdf':
+      return await generateCertificatePDF(certificate);
+      
+    case 'png':
+      const pdf = await generateCertificatePDF(certificate);
+      // Convert PDF to PNG (this would require additional libraries like pdf2pic)
+      // For now, we'll return the PDF
+      return pdf;
+      
+    case 'json':
+      // Return certificate data as JSON
+      const jsonData = {
+        certificate_id: certificate.certificate_id,
+        student_name: certificate.student_name,
+        course: certificate.course,
+        university: certificate.university,
+        grade: certificate.grade,
+        issue_date: certificate.created_at,
+        blockchain_verified: certificate.blockchain_verified,
+        blockchain_tx_hash: certificate.blockchain_tx_hash,
+        verification_url: `${window.location.origin}/verify`,
+        public_url: certificate.public_share_id ? `${window.location.origin}/certificate/${certificate.public_share_id}` : null
+      };
+      
+      const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `certificate_${certificate.certificate_id}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      return null; // JSON download is handled directly
+      
+    default:
+      throw new Error('Unsupported export format');
   }
 };

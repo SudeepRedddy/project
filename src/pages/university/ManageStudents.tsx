@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { UserPlus, Loader2, Search, Mail, User, Car as IdCard, Trash2, Users, Plus, X } from 'lucide-react';
+import { UserPlus, Loader2, Search, Mail, User, Car as IdCard, Trash2, Users, Plus, X, Upload } from 'lucide-react';
+import BulkStudentUpload from '../../components/BulkStudentUpload';
 
 const ManageStudents = () => {
     const { user } = useAuth();
@@ -15,6 +16,7 @@ const ManageStudents = () => {
     const [newStudentEmail, setNewStudentEmail] = useState('');
     const [newStudentRoll, setNewStudentRoll] = useState('');
     const [addingStudent, setAddingStudent] = useState(false);
+    const [showBulkUpload, setShowBulkUpload] = useState(false);
 
     const fetchStudents = useCallback(async () => {
         if (!user) return;
@@ -119,23 +121,53 @@ const ManageStudents = () => {
 
             {/* Add Student Button */}
             <div className="flex justify-center">
-                <button
-                    onClick={() => setShowAddForm(!showAddForm)}
-                    className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 transform hover:scale-105 shadow-lg font-semibold"
-                >
-                    {showAddForm ? (
-                        <>
-                            <X className="h-5 w-5 mr-2" />
-                            Cancel
-                        </>
-                    ) : (
-                        <>
-                            <UserPlus className="h-5 w-5 mr-2" />
-                            Add Student
-                        </>
-                    )}
-                </button>
+                <div className="flex space-x-4">
+                    <button
+                        onClick={() => {
+                            setShowAddForm(!showAddForm);
+                            setShowBulkUpload(false);
+                        }}
+                        className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 transform hover:scale-105 shadow-lg font-semibold"
+                    >
+                        {showAddForm ? (
+                            <>
+                                <X className="h-5 w-5 mr-2" />
+                                Cancel
+                            </>
+                        ) : (
+                            <>
+                                <UserPlus className="h-5 w-5 mr-2" />
+                                Add Student
+                            </>
+                        )}
+                    </button>
+                    
+                    <button
+                        onClick={() => {
+                            setShowBulkUpload(!showBulkUpload);
+                            setShowAddForm(false);
+                        }}
+                        className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all duration-200 transform hover:scale-105 shadow-lg font-semibold"
+                    >
+                        {showBulkUpload ? (
+                            <>
+                                <X className="h-5 w-5 mr-2" />
+                                Cancel
+                            </>
+                        ) : (
+                            <>
+                                <Upload className="h-5 w-5 mr-2" />
+                                Bulk Upload
+                            </>
+                        )}
+                    </button>
+                </div>
             </div>
+
+            {/* Bulk Upload Component */}
+            {showBulkUpload && (
+                <BulkStudentUpload onUploadComplete={fetchStudents} />
+            )}
 
             {/* Add Student Form */}
             {showAddForm && (

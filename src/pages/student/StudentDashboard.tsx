@@ -1,14 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Loader2, Download, Shield, AlertTriangle, Award, User, Calendar, Star, BookOpen } from 'lucide-react';
+import { Loader2, Download, Shield, AlertTriangle, Award, User, Calendar, Star, BookOpen, Share2, ExternalLink, FileX } from 'lucide-react';
 import { generateCertificatePDF } from '../../lib/pdf';
+import { trackAnalyticsEvent } from '../../lib/analytics';
 
 const StudentDashboard = () => {
     const { student } = useAuth();
     const [certificates, setCertificates] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [downloadingId, setDownloadingId] = useState<string | null>(null);
+    const [showRevocationForm, setShowRevocationForm] = useState<string | null>(null);
+    const [revocationReason, setRevocationReason] = useState('');
+    const [submittingRevocation, setSubmittingRevocation] = useState(false);
 
     const fetchCertificates = useCallback(async () => {
         if (!student) return;
@@ -39,11 +43,76 @@ const StudentDashboard = () => {
             const logoUrl = student?.university?.logo_url;
             const pdf = await generateCertificatePDF({ ...certificate, logoUrl });
             pdf.save(`${certificate.student_name.replace(/\s+/g, '_')}_${certificate.course.replace(/\s+/g, '_')}_Certificate.pdf`);
+            
+            // Track download event
+            await trackAnalyticsEvent({
+                certificate_id: certificate.certificate_id,
+                event_type: 'download'
+            });
         } catch (err) {
             console.error('Error downloading certificate:', err);
             alert('Failed to download certificate. Please try again.');
         } finally {
             setDownloadingId(null);
+        }
+    };
+
+    const generateShareLink = (certificate: any): string => {
+        return `${window.location.origin}/certificate/${certificate.public_share_id}`;
+    };
+
+    const handleShare = async (certificate: any) => {
+        const shareUrl = generateShareLink(certificate);
+        const shareText = `Check out my certificate: ${certificate.course} from ${certificate.university}`;
+
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: 'Certificate Verification',
+                    text: shareText,
+                    url: shareUrl
+                });
+            } catch (error) {
+                // Fallback to clipboard
+                await navigator.clipboard.writeText(shareUrl);
+                alert('Link copied to clipboard!');
+            }
+        } else {
+            // Fallback to clipboard
+            await navigator.clipboard.writeText(shareUrl);
+            alert('Link copied to clipboard!');
+        }
+
+        // Track share event
+        await trackAnalyticsEvent({
+            certificate_id: certificate.certificate_id,
+            event_type: 'share'
+        });
+    };
+
+    const handleRevocationRequest = async (certificateId: string) => {
+        if (!revocationReason.trim() || !student) return;
+
+        setSubmittingRevocation(true);
+        try {
+            const { error } = await supabase
+                .from('certificate_revocation_requests')
+                .insert({
+                    certificate_id: certificateId,
+                    student_id_ref: student.id,
+                    reason: revocationReason.trim()
+                });
+
+            if (error) throw error;
+
+            alert('Revocation request submitted successfully. The university will review your request.');
+            setShowRevocationForm(null);
+            setRevocationReason('');
+        } catch (error: any) {
+            console.error('Revocation request error:', error);
+            alert('Failed to submit revocation request: ' + error.message);
+        } finally {
+            setSubmittingRevocation(false);
         }
     };
 
@@ -155,26 +224,88 @@ const StudentDashboard = () => {
                                             </div>
                                         </div>
                                         
-                                        <div className="flex justify-end">
+                                        <div className="flex flex-wrap gap-3 justify-end">
+                                            <button
+                                                onClick={() => handleShare(cert)}
+                                                className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                                            >
+                                                <Share2 className="h-4 w-4 mr-2" />
+                                                Share
+                                            </button>
+                                            
+                                            <a
+                                                href={generateShareLink(cert)}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+                                            >
+                                                <ExternalLink className="h-4 w-4 mr-2" />
+                                                View Public
+                                            </a>
+                                            
                                             <button 
                                                 onClick={() => downloadCertificate(cert)} 
                                                 disabled={downloadingId === cert.certificate_id}
-                                                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-all duration-200 transform hover:scale-105 shadow-lg font-semibold"
+                                                className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 transition-all duration-200 font-medium"
                                             >
                                                 {downloadingId === cert.certificate_id ? (
                                                     <>
-                                                        <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                                                        <Loader2 className="animate-spin h-4 w-4 mr-2" />
                                                         Downloading...
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <Download className="h-5 w-5 mr-2"/>
-                                                        Download Certificate
+                                                        <Download className="h-4 w-4 mr-2"/>
+                                                        Download
                                                     </>
                                                 )}
                                             </button>
+                                            
+                                            <button
+                                                onClick={() => setShowRevocationForm(cert.certificate_id)}
+                                                className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                                            >
+                                                <FileX className="h-4 w-4 mr-2" />
+                                                Request Revocation
+                                            </button>
                                         </div>
                                     </div>
+                                    
+                                    {/* Revocation Form */}
+                                    {showRevocationForm === cert.certificate_id && (
+                                        <div className="mt-6 p-6 bg-red-50 rounded-xl border border-red-200">
+                                            <h4 className="font-semibold text-red-900 mb-3">Request Certificate Revocation</h4>
+                                            <p className="text-sm text-red-700 mb-4">
+                                                Please provide a reason for requesting revocation. This action will be reviewed by your university.
+                                            </p>
+                                            <textarea
+                                                value={revocationReason}
+                                                onChange={(e) => setRevocationReason(e.target.value)}
+                                                className="w-full px-4 py-3 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 mb-4"
+                                                rows={3}
+                                                placeholder="Enter reason for revocation..."
+                                                required
+                                            />
+                                            <div className="flex space-x-3">
+                                                <button
+                                                    onClick={() => handleRevocationRequest(cert.certificate_id)}
+                                                    disabled={submittingRevocation || !revocationReason.trim()}
+                                                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors font-medium"
+                                                >
+                                                    {submittingRevocation ? 'Submitting...' : 'Submit Request'}
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setShowRevocationForm(null);
+                                                        setRevocationReason('');
+                                                    }}
+                                                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors font-medium"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ))

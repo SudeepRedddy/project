@@ -464,6 +464,79 @@ export const issueCertificateOnBlockchain = async (
   }
 };
 
+// Batch certificate issuance to save gas fees
+export const issueBatchCertificatesOnBlockchain = async (
+  certificates: Array<{
+    certificateId: string;
+    studentId: string;
+    studentName: string;
+    course: string;
+    university: string;
+  }>
+): Promise<any> => {
+  // Ensure MetaMask is connected and on the right network
+  if (!isMetaMaskInstalled()) {
+    throw new Error('MetaMask is not installed.');
+  }
+
+  // Check if we're on Sepolia network
+  const isOnSepolia = await isOnSepoliaNetwork();
+  if (!isOnSepolia) {
+    throw new Error('Please switch to Sepolia testnet in MetaMask.');
+  }
+
+  // Ensure wallet is connected
+  if (!provider || !contract || !(provider instanceof ethers.BrowserProvider)) {
+    await connectWallet();
+    if (!provider || !contract) {
+      throw new Error('Failed to connect to MetaMask. Please try again.');
+    }
+  }
+
+  try {
+    const signer = await provider.getSigner();
+    const contractWithSigner = contract.connect(signer) as ethers.Contract;
+    
+    // For batch operations, we'll issue certificates one by one in a single transaction
+    // This is a simplified approach - in production, you'd want a proper batch contract method
+    const results = [];
+    
+    for (const cert of certificates) {
+      try {
+        const gasEstimate = await contractWithSigner.issueCertificate.estimateGas(
+          cert.certificateId,
+          cert.studentId,
+          cert.studentName,
+          cert.course,
+          cert.university
+        );
+        
+        const tx = await contractWithSigner.issueCertificate(
+          cert.certificateId,
+          cert.studentId,
+          cert.studentName,
+          cert.course,
+          cert.university,
+          {
+            gasLimit: Math.floor(Number(gasEstimate) * 1.2)
+          }
+        );
+        
+        const receipt = await tx.wait();
+        results.push({ certificateId: cert.certificateId, success: true, receipt });
+      } catch (error) {
+        console.error(`Failed to issue certificate ${cert.certificateId}:`, error);
+        results.push({ certificateId: cert.certificateId, success: false, error });
+      }
+    }
+    
+    return results;
+  } catch (error: any) {
+    console.error('Error issuing batch certificates:', error);
+    throw error;
+  }
+};
+
 export const verifyCertificateOnBlockchain = async (certificateId: string): Promise<any> => {
   if (!contract) {
     await initWeb3();

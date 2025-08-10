@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Users, FileCheck, List, Building2, Award, BarChart3 } from 'lucide-react';
+import { Users, FileCheck, List, Building2, Award, BarChart3, Settings, Palette } from 'lucide-react';
 import ManageStudents from './ManageStudents';
 import GenerateCertificate from './GenerateCertificate';
 import CertificateList from './CertificateList';
+import AnalyticsDashboard from '../../components/AnalyticsDashboard';
+import UniversitySettings from '../../components/UniversitySettings';
+import CertificateTemplates from '../../components/CertificateTemplates';
 
 const UniversityDashboard = () => {
     const { university } = useAuth();
@@ -44,6 +47,27 @@ const UniversityDashboard = () => {
             description: 'View issued certificates',
             color: 'from-purple-500 to-pink-500'
         }
+        { 
+            id: 'analytics', 
+            label: 'Analytics', 
+            icon: BarChart3,
+            description: 'View performance metrics',
+            color: 'from-orange-500 to-red-500'
+        },
+        { 
+            id: 'templates', 
+            label: 'Templates', 
+            icon: Palette,
+            description: 'Manage certificate designs',
+            color: 'from-pink-500 to-rose-500'
+        },
+        { 
+            id: 'settings', 
+            label: 'Settings', 
+            icon: Settings,
+            description: 'University configuration',
+            color: 'from-gray-500 to-slate-500'
+        }
     ];
 
     const renderContent = () => {
@@ -54,6 +78,12 @@ const UniversityDashboard = () => {
                 return <GenerateCertificate />;
             case 'certificates':
                 return <CertificateList />;
+            case 'analytics':
+                return <AnalyticsDashboard />;
+            case 'templates':
+                return <CertificateTemplates />;
+            case 'settings':
+                return <UniversitySettings />;
             default:
                 return <ManageStudents />;
         }

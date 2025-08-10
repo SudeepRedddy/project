@@ -9,6 +9,7 @@ import UniversityRegister from './pages/UniversityRegister';
 import UniversityDashboard from './pages/university/UniversityDashboard';
 import StudentDashboard from './pages/student/StudentDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
+import PublicCertificate from './pages/PublicCertificate';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
             <Route path="/verify" element={<VerifyCertificate />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<UniversityRegister />} />
+            <Route path="/certificate/:shareId" element={<PublicCertificate />} />
 
             {/* University Protected Route */}
             <Route

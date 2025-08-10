@@ -7,6 +7,7 @@ import {
   initWeb3, 
   isWeb3Initialized 
 } from '../lib/blockchain';
+import { trackAnalyticsEvent } from '../lib/analytics';
 import BlockchainStatus from '../components/BlockchainStatus';
 
 const VerifyCertificate = () => {
@@ -49,6 +50,12 @@ const VerifyCertificate = () => {
 
       if (data && data.length > 0) {
         setCertificate(data[0]);
+        
+        // Track verification event
+        await trackAnalyticsEvent({
+          certificate_id: trimmedCertId,
+          event_type: 'verification'
+        });
         
         try {
           if (!isWeb3Initialized()) {
