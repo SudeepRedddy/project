@@ -46,7 +46,7 @@ const UniversityDashboard = () => {
             icon: List,
             description: 'View issued certificates',
             color: 'from-purple-500 to-pink-500'
-        }
+        },
         { 
             id: 'analytics', 
             label: 'Analytics', 
