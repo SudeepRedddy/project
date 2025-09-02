@@ -55,10 +55,23 @@ export const trackAnalyticsEvent = async (event: AnalyticsEvent): Promise<void> 
 
 const incrementCertificateCounter = async (certificateId: string, counterField: string): Promise<void> => {
   try {
-    const { error } = await supabase.rpc('increment_certificate_counter', {
-      cert_id: certificateId,
-      counter_field: counterField
-    });
+    // Since we don't have the RPC function, we'll update directly
+    const { data: currentCert, error: fetchError } = await supabase
+      .from('certificates')
+      .select(counterField)
+      .eq('certificate_id', certificateId)
+      .single();
+
+    if (fetchError) {
+      console.error('Fetch error:', fetchError);
+      return;
+    }
+
+    const currentCount = currentCert[counterField] || 0;
+    const { error } = await supabase
+      .from('certificates')
+      .update({ [counterField]: currentCount + 1 })
+      .eq('certificate_id', certificateId);
 
     if (error) {
       console.error('Counter increment error:', error);
