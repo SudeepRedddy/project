@@ -134,7 +134,12 @@ const GenerateCertificate = () => {
       university: university.name,
       created_at: new Date().toISOString(),
       grade: grade,
-      logoUrl: university.logo_url // Pass the dynamic logo URL here
+      logoUrl: university.logo_url, // Pass the dynamic logo URL here
+      colors: {
+        primary: university.primary_color || '#1B365D',
+        secondary: university.secondary_color || '#B08D57',
+        background: university.certificate_background || '#FAF9F6'
+      }
     });
     const pdfBlob = pdf.output('blob');
     const previewUrl = URL.createObjectURL(pdfBlob);

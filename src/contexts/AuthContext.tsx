@@ -21,6 +21,10 @@ interface University {
   id: string;
   name: string;
   address?: string;
+  logo_url?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  certificate_background?: string;
 }
 
 // The shape of our Authentication Context
