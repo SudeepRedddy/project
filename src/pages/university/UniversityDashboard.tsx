@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Users, FileCheck, List, Building2, Award, BarChart3, Settings, Palette } from 'lucide-react';
+import { Users, FileCheck, List, Building2, Award, BarChart3, Settings, Palette, Bell, Search, ChevronDown } from 'lucide-react';
 import ManageStudents from './ManageStudents';
 import GenerateCertificate from './GenerateCertificate';
 import CertificateList from './CertificateList';
@@ -14,12 +14,12 @@ const UniversityDashboard = () => {
 
     if (!university) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
                 <div className="text-center">
-                    <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <div className="w-16 h-16 bg-blue-600 rounded-lg flex items-center justify-center mx-auto mb-4 shadow-lg">
                         <Building2 className="h-8 w-8 text-white" />
                     </div>
-                    <p className="text-gray-600 text-lg">Loading university data...</p>
+                    <p className="text-gray-600 font-medium">Loading...</p>
                 </div>
             </div>
         );
@@ -28,47 +28,48 @@ const UniversityDashboard = () => {
     const tabs = [
         { 
             id: 'students', 
-            label: 'Manage Students', 
+            label: 'Students', 
             icon: Users,
-            description: 'Add and manage your students',
-            color: 'from-green-500 to-emerald-500'
+            // count: '1,245',
+            description: 'Manage student records'
         },
         { 
             id: 'generate', 
-            label: 'Generate Certificate', 
+            label: 'Generate Certificates', 
             icon: FileCheck,
-            description: 'Create blockchain certificates',
-            color: 'from-blue-500 to-indigo-500'
+            // count: '89',
+            description: 'Generate new certificates'
         },
         { 
             id: 'certificates', 
-            label: 'View Certificates', 
+            label: 'Records', 
             icon: List,
-            description: 'View issued certificates',
-            color: 'from-purple-500 to-pink-500'
+            // count: '2,156',
+            description: 'View certificate records'
         },
         { 
             id: 'analytics', 
             label: 'Analytics', 
             icon: BarChart3,
-            description: 'View performance metrics',
-            color: 'from-orange-500 to-red-500'
+            // trend: '+12%',
+            description: 'Performance insights'
         },
         { 
             id: 'templates', 
             label: 'Templates', 
             icon: Palette,
-            description: 'Manage certificate designs',
-            color: 'from-pink-500 to-rose-500'
+            // count: '24',
+            description: 'Certificate designs'
         },
         { 
             id: 'settings', 
             label: 'Settings', 
             icon: Settings,
-            description: 'University configuration',
-            color: 'from-gray-500 to-slate-500'
+            description: 'System configuration'
         }
     ];
+
+    const activeTabData = tabs.find(tab => tab.id === activeTab);
 
     const renderContent = () => {
         switch (activeTab) {
@@ -90,74 +91,92 @@ const UniversityDashboard = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+        <div className="min-h-screen bg-gray-50">
             {/* Header */}
-            <div className="bg-white shadow-lg border-b border-gray-200">
-                <div className="max-w-7xl mx-auto px-4 py-8">
+            <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
+                <div className="px-6 py-4">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                            <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mr-6 shadow-lg">
-                                <Building2 className="h-8 w-8 text-white" />
-                            </div>
-                            <div>
-                                <h1 className="text-3xl font-bold text-gray-900 mb-1">
-                                    {university.name}
-                                </h1>
-                                <p className="text-gray-600 text-lg">University Dashboard</p>
+                        {/* Left Section */}
+                        <div className="flex items-center space-x-6">
+                            <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm">
+                                    <Building2 className="h-5 w-5 text-white" />
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold text-gray-900">{university.name}</h1>
+                                    <p className="text-sm text-gray-500">Education Management System</p>
+                                </div>
                             </div>
                         </div>
+
+                        {/* Right Section */}
                         <div className="flex items-center space-x-4">
-                            <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-2 rounded-full shadow-lg">
-                                <span className="text-white font-semibold flex items-center">
-                                    <Award className="h-4 w-4 mr-2" />
-                                    Active
-                                </span>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search..."
+                                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
+                                />
+                            </div>
+                            <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                                <Bell className="h-5 w-5" />
+                            </button>
+                            <div className="flex items-center space-x-2 px-3 py-2 bg-green-50 text-green-700 rounded-lg">
+                                <Award className="h-4 w-4" />
+                                <span className="text-sm font-medium">Verified</span>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </header>
 
-            {/* Navigation Tabs */}
-            <div className="bg-white border-b border-gray-200 shadow-sm">
-                <div className="max-w-7xl mx-auto px-4">
-                    <div className="flex space-x-8 overflow-x-auto">
+            {/* Navigation */}
+            <nav className="bg-white border-b border-gray-200 sticky top-[73px] z-30">
+                <div className="px-6">
+                    <div className="flex space-x-8 overflow-x-auto scrollbar-hide">
                         {tabs.map((tab) => {
                             const Icon = tab.icon;
+                            const isActive = activeTab === tab.id;
                             return (
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
-                                    className={`flex items-center py-6 px-4 border-b-3 font-semibold text-sm transition-all duration-200 whitespace-nowrap ${
-                                        activeTab === tab.id
-                                            ? 'border-blue-500 text-blue-600 bg-blue-50'
-                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                                    className={`flex items-center space-x-3 py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${
+                                        isActive
+                                            ? 'border-blue-600 text-blue-600'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                     }`}
                                 >
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center mr-3 ${
-                                        activeTab === tab.id 
-                                            ? `bg-gradient-to-r ${tab.color}` 
-                                            : 'bg-gray-100'
-                                    }`}>
-                                        <Icon className={`h-4 w-4 ${
-                                            activeTab === tab.id ? 'text-white' : 'text-gray-500'
-                                        }`} />
-                                    </div>
-                                    <div className="text-left">
-                                        <div className="font-semibold">{tab.label}</div>
-                                        <div className="text-xs text-gray-500">{tab.description}</div>
-                                    </div>
+                                    <Icon className="h-5 w-5" />
+                                    <span>{tab.label}</span>
+                                    {tab.count && (
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                            isActive ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'
+                                        }`}>
+                                            {tab.count}
+                                        </span>
+                                    )}
+                                    {tab.trend && (
+                                        <span className="px-2 py-1 bg-green-100 text-green-600 rounded-full text-xs font-medium">
+                                            {tab.trend}
+                                        </span>
+                                    )}
                                 </button>
                             );
                         })}
                     </div>
                 </div>
-            </div>
+            </nav>
 
-            {/* Content */}
-            <div className="max-w-7xl mx-auto px-4 py-12">
-                {renderContent()}
-            </div>
+            {/* Main Content */}
+            <main className="px-6 py-8">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+                    <div className="p-8">
+                        {renderContent()}
+                    </div>
+                </div>
+            </main>
         </div>
     );
 };
